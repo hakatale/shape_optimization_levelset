@@ -1,0 +1,206 @@
+// Shape optimization of NS flow with level-set method.
+load "medit"
+load "isoline"
+include "macros.edp"
+include "solvers.edp"
+include "distance.edp"
+// ofstream f("data.txt");
+// f<<"hello"<<endl;
+// cout<<"hello"<<endl;
+
+// Parameters.
+real l = 1e1;
+real b = 1e-2;
+real btarget = 1e1;
+real alpha = 1.05;
+real mu = 1./200;
+real[int, int] fixP = [[-0.75, 0.25], [0.75,0.5], [1., 0.25], [1., -0.25], [0.75, -0.5], [-0.75, -0.25]];
+// real minLength = 0.2;
+
+// Initilize the mesh.
+int n = 3;
+border b1(t = -0.75, 0.75){x = t; y = -0.5; label = 1;}
+border c1(t = 0, 0.25){x = 0.75 + t; y = -0.5 + t; label = 2;}
+border b2(t = -pi/2, pi/2){x = 1 + 0.05 * cos(t); y = 0.25 * sin(t); label = 1;}
+border c2(t = 0, 0.25){x = 1. - t; y = 0.25 + t; label = 2;}
+border b3(t = 0.75, -0.75){x = t; y = 0.5; label = 1;}
+border b4(t = 0.5, 0.25){x = -0.75; y = t; label = 1;}
+border c3(t = 0.25, -0.25){x = -0.75; y = t; label = 1;}
+border b5(t = -0.25, -0.5){x = -0.75; y = t; label = 1;}
+real[int,int] xy(3,1); // to store the isoline points
+int[int] be(1); // to store the begin , end couple of lines
+mesh Th = buildmesh(b1(10 * n) + c1(3 * n) + b2(5 * n) + c2(3 * n) + b3(10 * n) + b4(n) + c3(3 * n) + b5(n));
+// plot(Th,wait = 1);
+mesh Thf;
+fespace Wh(Th,P1b);
+Wh psi, psi0, psif = 0, khi, phi, X, cx = x, cy = y, dp1, dp2;
+psi = -((x <= 0.8) * ((y >= 0) * (x - 6 * y + 2.25)/sqrt(37) + (y <= 0) * (x + 6 * y + 2.25)/sqrt(37)) + (x >= 0.8) * (-x + 1));
+// psi = (0.1 - min(sqrt((x - 0.15)^2 + (y)^2),sqrt((x + 0.15)^2 + (y)^2)));
+X = (psi<=0);
+// plot(Th, wait = 1);
+
+// connect boundary.
+func int conBound(real[int,int] xy, int[int] be, int nbc, real[int,int] fixP)
+{
+  real d;
+  int be1, be2, cj1, cj2;
+  // cout<<nbc<<endl;
+  for(int i = 0; i < nbc; i++)
+  {
+    be1 = be[2 * i];
+    be2 = be[2*i+1]-1;
+    d = 10.;
+    for(int j = 0; j < 6; j++)
+    {
+      if (d > DD(fixP(j,0), fixP(j,1), xy(0,be1), xy(1,be1)))
+      {
+        d = DD(fixP(j,0), fixP(j,1), xy(0,be1), xy(1,be1));
+        // cout<<i<<" fixP "<< j <<" d = "<<d<<endl;
+        cj1 = j;
+      }
+    }
+    xy(0,be1) = fixP(cj1,0);
+    xy(1,be1) = fixP(cj1,1);
+
+    d = 10.;
+    for(int j = 0; j < 6; j++)
+    {
+      if (d > DD(fixP(j,0), fixP(j,1), xy(0,be2), xy(1,be2)))
+      {
+        d = DD(fixP(j,0), fixP(j,1), xy(0,be2), xy(1,be2));
+        cj2 = j;
+      }
+    }
+    xy(0,be2) = fixP(cj2,0);
+    xy(1,be2) = fixP(cj2,1);
+  }
+  return 0;
+}
+
+// Regenerating mesh of fluid domain.
+func int genMesh() 
+{
+  real iso = 0.;
+  real[int,int] xy(3,1);
+  int[int] be(1);
+  int nbc;
+  nbc = isoline(Th,psi,xy,close=0,iso=iso,beginend=be,smoothing=0.);
+  cout<<" end isoline......"<<endl;
+  conBound(xy, be, nbc, fixP);
+  border cur(t = 0,1;c)
+  {
+      int i0 = be[2*c], i1 = be[2*c+1]-1;
+      P=Curve(xy,i0,i1,t);
+      label=3;
+  }
+  cout<<"end curve......"<<endl;
+
+  int[int] nn(nbc), nm(nbc);
+  // int nn, nm;
+  nn = 10 * n;
+  nm = -10 * n;
+  nm[2] = -5 * n;
+
+  // plot(c1(3 * n) + c2(3 * n) + c3(2 * n) + cur(nm));
+  Thf = buildmesh(c1(3 * n) + c2(3 * n) + c3(2 * n) + cur(nm));
+  // Th = buildmesh(b1(10 * n) + c1(3 * n) + b2(5 * n) + c2(3 * n) + b3(10 * n) + b4(n) + c3(3 * n) + b5(n)  + cur(nm));
+  // plot(Thf,wait = 1);
+  cout<<"end mesh generating......"<<endl;
+  // cout<< "be = " << be <<endl;
+  psif[] = funcD(cx[], cy[], xy, cx[].n, 0, be.max);
+  // plot(psif, dim = 3d, fill = 1, wait = 1);
+  psi = psif * (1 - X) - psif * X;
+  // psif = psi;
+  // solve elip(psi,khi) = int2d(Th)(psi * khi) - int2d(Th)(psif * khi) + on(1,2,psi = psif);
+  // plot(psi,dim = 3d, fill = 1);
+  return 0;
+}
+
+genMesh();
+// plot(Thf,wait=1);
+
+// Computing.
+fespace Vhf(Thf,P2);
+fespace Qhf(Thf,P1);
+Vhf v1, v2, phi1, phi2, w1, w2, vb1, vb2, dv1, dv2, eta1, eta2, tta1, tta2;
+Qhf p, pp, q,  dp;
+vb1 = -4 * y * y + 0.25;
+vb2 = 0.;
+
+state;
+
+real Con0 = 0.75 * Constr(Thf);
+real constrtarget = Con0;
+cout<<"dddddddd = "<<constrtarget<<endl;
+real J0 = J, J1;
+
+mesh Thf2;
+int jjmax = 1000;
+int iimax = 5;
+int kkmax = 3;
+real errc = 1e-2;
+int kk, ii, jj;
+
+int n0 = 100;
+real L1,L0,tau1,tau = 1e-3, err;
+
+for(int j= 0; j<=jjmax+1;j++){
+  cout << "Iter " <<j<<endl;
+  Thf2 = Thf;
+  cout<<"State."<<endl;
+  state;
+  cout<<"Adjoint."<<endl;
+  adjoint;
+  tau1 = tau;
+  L0 = L;
+  // J0 = J;
+  // dp1 = -dx(psi) / sqrt(dx(psi) ^ 2 + dy(psi) ^2);
+  // dp2 = -dy(psi) / sqrt(dx(psi) ^ 2 + dy(psi) ^2);
+  regu;
+  // plot([v1,v2]);
+
+  // tta1 = tta1 * (1-X);
+  // tta2 = tta2 * (1-X);
+  // plot([tta1,tta2]);
+  psi0 = psi;
+  for(int i = 0; i<=iimax; i++){
+    // Choose dt so L<L0.
+    // psi0 = psi;
+    cout<<"Levelset advection."<<endl;
+    Advect;
+    // plot(psi,dim=3d,wait=1);
+    genMesh();
+    // Thf = adaptmesh(Thf, hmax = meshsize, hmin = meshsize/sqrt(2), ratio = 1.5);
+    cout<<"Test state."<<endl;
+    state;
+    cout<<"Test adjoint."<<endl;
+    adjoint;
+    L1 = L;
+    // J1 = J;
+    cout<<"getting L......"<<endl;
+    if (L1<L0)
+      break;
+    else
+    {
+      tau1*=0.5;
+      // psi = psi0; //really???
+      // continue;
+    }
+    if (i == iimax) {
+      Thf = Thf2;
+      psi = psi0;
+    }
+  }
+  err = sqrt(int2d(Th)(tta1 * tta1 + tta2 * tta2));
+  plot(psi);
+  // f<<j<<" "<<J<<" "<<L0<<" "<<Constr(Thf)<<" "<<l<<" "<<err<<endl;
+  // if (j%10==0)
+  // {
+  //   savesol("Th." + string(j) + ".sol", Th, psi);
+  //   savemesh(Thf,"Th." + string(j) + ".mesh");
+  // }
+
+  l = l + b * (Constr(Thf) - constrtarget)/Con0;
+  if (j < n0)
+    b*=alpha;
+}
