@@ -131,7 +131,7 @@ state;
 
 real Con0 = 0.75 * Constr(Thf);
 real constrtarget = Con0;
-cout<<"dddddddd = "<<constrtarget<<endl;
+// cout<<"dddddddd = "<<constrtarget<<endl;
 real J0 = J, J1;
 
 mesh Thf2;
@@ -154,13 +154,9 @@ for(int j= 0; j<=jjmax+1;j++){
   tau1 = tau;
   L0 = L;
   // J0 = J;
-  // dp1 = -dx(psi) / sqrt(dx(psi) ^ 2 + dy(psi) ^2);
-  // dp2 = -dy(psi) / sqrt(dx(psi) ^ 2 + dy(psi) ^2);
   regu;
   // plot([v1,v2]);
 
-  // tta1 = tta1 * (1-X);
-  // tta2 = tta2 * (1-X);
   // plot([tta1,tta2]);
   psi0 = psi;
   for(int i = 0; i<=iimax; i++){
