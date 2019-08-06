@@ -4,7 +4,7 @@ load "medit"
 include "macros.edp"
 include "solvers.edp"
 include "distance.edp"
-ofstream f("data.txt");
+// ofstream f("data.txt");
 
 // Parameters.
 real l = 1e1;
@@ -118,7 +118,7 @@ state;
 
 real Con0 = Constr(Thf);
 real constrtarget = Con0;
-f<<constrtarget<<endl;
+// f<<constrtarget<<endl;
 real J0 = J, J1;
 
 mesh Thf2;
@@ -143,12 +143,8 @@ for(int j= 0; j<=jjmax+1;j++){
   // J0 = J;
   regu;
   // plot([v1,v2]);
-  // dp1 = -dx(psi) * dL/(sqrt(dx(psi)^2 + dy(psi)^2) + 1e-8);
-  // dp2 = -dy(psi) * dL/(sqrt(dx(psi)^2 + dy(psi)^2) + 1e-8);
   dp1 = tta1;
   dp2 = tta2;
-  // tta1 = tta1 * (1-X);
-  // tta2 = tta2 * (1-X);
   // plot([tta1,tta2]);
   psi0 = psi;
   for(int i = 0; i<=iimax; i++){
@@ -181,7 +177,7 @@ for(int j= 0; j<=jjmax+1;j++){
   }
   err = sqrt(int2d(Th)(dp1 * dp1 + dp2 * dp2));
   plot(psi,fill =1);
-  f<<j<<" "<<J<<" "<<L0<<" "<<Constr(Thf)<<" "<<l<<" "<<err<<endl;
+  // f<<j<<" "<<J<<" "<<L0<<" "<<Constr(Thf)<<" "<<l<<" "<<err<<endl;
   // if (j%10==0)
   // {
   //   savesol("Th." + string(j) + ".sol", Th, psi);
